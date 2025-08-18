@@ -134,14 +134,12 @@ def run_app():
 
             requerimentos = []
 
-            # padrões normais
+            # padrões
             rqn_pattern = re.compile(r"^(?:\s*)(Nº)\s+(\d{2}\.?\d{3}/\d{4})\s*,\s*(do|da)", re.MULTILINE)
             rqc_pattern = re.compile(r"^(?:\s*)(nº)\s+(\d{2}\.?\d{3}/\d{4})\s*,\s*(do|da)", re.MULTILINE)
-
-            # padrão para NÃO recebidos
-            rqn_nao_recebido_pattern = re.compile(
-                r"REQUERIMENTO Nº (\d{2}\.?\d{3}/\d{4})", re.IGNORECASE
-            )
+            
+            # Novo padrão para o título "Proposições não recebidas"
+            nao_recebidas_header_pattern = re.compile(r"^\s*\*\s*PROPOSIÇÕES NÃO RECEBIDAS\s*\*\s*$", re.MULTILINE | re.IGNORECASE)
 
             # requerimentos normais (RQN)
             for match in rqn_pattern.finditer(text):
@@ -168,14 +166,28 @@ def run_app():
                 num_part, ano = nums_in_block[0].replace(".", "").split("/")
                 classif = classify_req(block)
                 requerimentos.append(["RQC", num_part, ano, "", "", classif])
+            
+            # requerimentos NÃO recebidos (usando a nova lógica)
+            header_match = nao_recebidas_header_pattern.search(text)
+            if header_match:
+                start_idx = header_match.end()
+                # Encontrar o próximo título de seção para definir o final do bloco
+                next_section_pattern = re.compile(r"^\s*\*.*\*\s*$", re.MULTILINE) # Padrão para qualquer outro título
+                next_section_match = next_section_pattern.search(text, start_idx)
+                end_idx = next_section_match.start() if next_section_match else len(text)
+                
+                nao_recebidos_block = text[start_idx:end_idx]
+                
+                # Padrão para extrair os números dos requerimentos dentro do bloco
+                rqn_nao_recebido_pattern = re.compile(r"REQUERIMENTO Nº (\d{2}\.?\d{3}/\d{4})", re.IGNORECASE)
+                
+                for match in rqn_nao_recebido_pattern.finditer(nao_recebidos_block):
+                    numero_ano = match.group(1).replace(".", "")
+                    num_part, ano = numero_ano.split("/")
+                    requerimentos.append(["RQN", num_part, ano, "NÃO RECEBIDO", "", ""])
 
-            # requerimentos NÃO recebidos
-            for match in rqn_nao_recebido_pattern.finditer(text):
-                numero_ano = match.group(1).replace(".", "")
-                num_part, ano = numero_ano.split("/")
-                requerimentos.append(["RQN", num_part, ano, "NÃO RECEBIDO", "", ""])
 
-            # remover duplicados
+            # remover duplicados (feito no final de todas as extrações)
             unique_reqs = []
             seen = set()
             for r in requerimentos:
@@ -202,60 +214,4 @@ def run_app():
                 text_before_title = text[:title_match.start()]
                 last_project_match = None
                 for match in project_pattern.finditer(text_before_title):
-                    last_project_match = match
-                if last_project_match:
-                    sigla_raw = last_project_match.group(2)
-                    sigla_map = {
-                        "requerimento": "RQN",
-                        "projeto de lei": "PL",
-                        "pl": "PL",
-                        "projeto de resolução": "PRE",
-                        "pre": "PRE",
-                        "proposta de emenda à constituição": "PEC",
-                        "pec": "PEC",
-                        "projeto de lei complementar": "PLC",
-                        "plc": "PLC"
-                    }
-                    sigla = sigla_map.get(sigla_raw.lower(), sigla_raw.upper())
-                    numero = last_project_match.group(3).replace(".", "")
-                    ano = last_project_match.group(4)
-                    project_key = (sigla, numero, ano)
-                    item_type = "EMENDA" if "EMENDA" in title_match.group(0).upper() else "SUBSTITUTIVO"
-                    if project_key not in found_projects:
-                        found_projects[project_key] = set()
-                    found_projects[project_key].add(item_type)
-            
-            pareceres = []
-            for (sigla, numero, ano), types in found_projects.items():
-                type_str = "SUB/EMENDA" if len(types) > 1 else list(types)[0]
-                pareceres.append([sigla, numero, ano, type_str])
-            df_pareceres = pd.DataFrame(pareceres)
-        
-        st.success("Dados extraídos com sucesso! ✅")
-        st.divider()
-
-        # ==========================
-        # SALVAR EM EXCEL
-        # ==========================
-        output = io.BytesIO()
-        excel_file_name = "resultado_extraido.xlsx"
-        
-        with pd.ExcelWriter(output, engine="openpyxl") as writer:
-            df_normas.to_excel(writer, sheet_name="Normas", index=False, header=False)
-            df_proposicoes.to_excel(writer, sheet_name="Proposicoes", index=False, header=False)
-            df_requerimentos.to_excel(writer, sheet_name="Requerimentos", index=False, header=False)
-            df_pareceres.to_excel(writer, sheet_name="Pareceres", index=False, header=False)
-        
-        output.seek(0)
-
-        st.download_button(
-            label="Clique aqui para baixar o arquivo Excel",
-            data=output,
-            file_name=excel_file_name,
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-        st.info("O download do arquivo Excel com todos os dados extraídos está pronto.")
-
-# Executar
-if __name__ == "__main__":
-    run_app()
+                    last
