@@ -138,8 +138,8 @@ def run_app():
             rqn_pattern = re.compile(r"^(?:\s*)(Nº)\s+(\d{2}\.?\d{3}/\d{4})\s*,\s*(do|da)", re.MULTILINE)
             rqc_pattern = re.compile(r"^(?:\s*)(nº)\s+(\d{2}\.?\d{3}/\d{4})\s*,\s*(do|da)", re.MULTILINE)
             
-            # Novo padrão para o título "Proposições não recebidas"
-            nao_recebidas_header_pattern = re.compile(r"^\s*\*\s*PROPOSIÇÕES NÃO RECEBIDAS\s*\*\s*$", re.MULTILINE | re.IGNORECASE)
+            # Novo padrão para o título "Proposições não recebidas" - mais flexível
+            nao_recebidas_header_pattern = re.compile(r"^\s*\*?proposições não recebidas\*?\s*$", re.MULTILINE | re.IGNORECASE)
 
             # requerimentos normais (RQN)
             for match in rqn_pattern.finditer(text):
