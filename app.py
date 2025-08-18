@@ -184,7 +184,7 @@ def run_app():
                 for match in rqn_nao_recebido_pattern.finditer(nao_recebidos_block):
                     numero_ano = match.group(1).replace(".", "")
                     num_part, ano = numero_ano.split("/")
-                    requerimentos.append(["RQN", num_part, ano, "NÃO RECEBIDO", "", ""])
+                    requerimentos.append(["RQN", num_part, ano, "", "", "NÃO RECEBIDO"])
 
 
             # remover duplicados
