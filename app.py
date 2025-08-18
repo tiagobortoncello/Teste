@@ -138,8 +138,8 @@ def run_app():
             rqn_pattern = re.compile(r"^(?:\s*)(Nº)\s+(\d{2}\.?\d{3}/\d{4})\s*,\s*(do|da)", re.MULTILINE)
             rqc_pattern = re.compile(r"^(?:\s*)(nº)\s+(\d{2}\.?\d{3}/\d{4})\s*,\s*(do|da)", re.MULTILINE)
             
-            # Novo padrão para o título "Proposições não recebidas" - mais flexível
-            nao_recebidas_header_pattern = re.compile(r"^\s*\*?proposições não recebidas\*?\s*$", re.MULTILINE | re.IGNORECASE)
+            # Padrão flexível para o título "Proposições não recebidas"
+            nao_recebidas_header_pattern = re.compile(r"^\s*(\*?)\s*PROPOSIÇÕES\s*NÃO\s*RECEBIDAS\s*(\*?)\s*$", re.MULTILINE | re.IGNORECASE)
 
             # requerimentos normais (RQN)
             for match in rqn_pattern.finditer(text):
@@ -167,12 +167,12 @@ def run_app():
                 classif = classify_req(block)
                 requerimentos.append(["RQC", num_part, ano, "", "", classif])
             
-            # requerimentos NÃO recebidos (usando a nova lógica)
+            # requerimentos NÃO recebidos
             header_match = nao_recebidas_header_pattern.search(text)
             if header_match:
                 start_idx = header_match.end()
-                # Encontrar o próximo título de seção para definir o final do bloco
-                next_section_pattern = re.compile(r"^\s*\*.*\*\s*$", re.MULTILINE) # Padrão para qualquer outro título
+                # Define o final do bloco de texto como o próximo cabeçalho ou o final do arquivo
+                next_section_pattern = re.compile(r"^\s*(\*?)\s*.*\s*(\*?)\s*$", re.MULTILINE)
                 next_section_match = next_section_pattern.search(text, start_idx)
                 end_idx = next_section_match.start() if next_section_match else len(text)
                 
@@ -187,7 +187,7 @@ def run_app():
                     requerimentos.append(["RQN", num_part, ano, "NÃO RECEBIDO", "", ""])
 
 
-            # remover duplicados (feito no final de todas as extrações)
+            # remover duplicados
             unique_reqs = []
             seen = set()
             for r in requerimentos:
