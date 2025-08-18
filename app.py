@@ -103,18 +103,41 @@ def run_app():
                 r"^(PROJETO DE LEI COMPLEMENTAR|PROJETO DE LEI|INDICAÇÃO|PROJETO DE RESOLUÇÃO|PROPOSTA DE EMENDA À CONSTITUIÇÃO|MENSAGEM|VETO) Nº (\d{1,4}\.?\d{0,3}/\d{4})$",
                 re.MULTILINE
             )
+            
+            # Padrão de regex para a ementa de utilidade pública
+            pattern_utilidade = re.compile(
+                r"Declara de utilidade pública a (.*?)-.*?-, com sede no Município de (.*?)\.",
+                re.DOTALL | re.IGNORECASE
+            )
+            
             proposicoes = []
-            for match in pattern_prop.finditer(text):
+            prop_matches = list(pattern_prop.finditer(text))
+            
+            for i, match in enumerate(prop_matches):
                 start_idx = match.end()
+                # Define o fim do bloco como o início do próximo projeto ou o fim do texto
+                end_idx = prop_matches[i+1].start() if i + 1 < len(prop_matches) else len(text)
+                block = text[start_idx:end_idx]
+
+                # Ignora proposições com a emenda "Redação do Vencido"
                 subseq_text = text[start_idx:start_idx+30]
                 if "(Redação do Vencido)" in subseq_text:
                     continue
+
                 tipo_extenso = match.group(1)
                 numero_ano = match.group(2).replace(".", "")
                 numero, ano = numero_ano.split("/")
                 sigla = tipo_map_prop[tipo_extenso]
-                proposicoes.append([sigla, numero, ano])
-            df_proposicoes = pd.DataFrame(proposicoes)
+                
+                # Verifica se o bloco de texto é de "Utilidade Pública"
+                utilidade_publica = ""
+                if pattern_utilidade.search(block):
+                    utilidade_publica = "Utilidade Pública"
+                    
+                proposicoes.append([sigla, numero, ano, utilidade_publica])
+            
+            df_proposicoes = pd.DataFrame(proposicoes, columns=['Sigla', 'Numero', 'Ano', 'Utilidade Pública'])
+
 
             # ==========================
             # ABA 3: Requerimentos
@@ -242,31 +265,31 @@ def run_app():
                 type_str = "SUB/EMENDA" if len(types) > 1 else list(types)[0]
                 pareceres.append([sigla, numero, ano, type_str])
             df_pareceres = pd.DataFrame(pareceres)
-        
-        st.success("Dados extraídos com sucesso! ✅")
-        st.divider()
+            
+            st.success("Dados extraídos com sucesso! ✅")
+            st.divider()
 
-        # ==========================
-        # SALVAR EM EXCEL
-        # ==========================
-        output = io.BytesIO()
-        excel_file_name = "resultado_extraido.xlsx"
-        
-        with pd.ExcelWriter(output, engine="openpyxl") as writer:
-            df_normas.to_excel(writer, sheet_name="Normas", index=False, header=False)
-            df_proposicoes.to_excel(writer, sheet_name="Proposicoes", index=False, header=False)
-            df_requerimentos.to_excel(writer, sheet_name="Requerimentos", index=False, header=False)
-            df_pareceres.to_excel(writer, sheet_name="Pareceres", index=False, header=False)
-        
-        output.seek(0)
+            # ==========================
+            # SALVAR EM EXCEL
+            # ==========================
+            output = io.BytesIO()
+            excel_file_name = "resultado_extraido.xlsx"
+            
+            with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                df_normas.to_excel(writer, sheet_name="Normas", index=False, header=False)
+                df_proposicoes.to_excel(writer, sheet_name="Proposicoes", index=False, header=True)
+                df_requerimentos.to_excel(writer, sheet_name="Requerimentos", index=False, header=False)
+                df_pareceres.to_excel(writer, sheet_name="Pareceres", index=False, header=False)
+            
+            output.seek(0)
 
-        st.download_button(
-            label="Clique aqui para baixar o arquivo Excel",
-            data=output,
-            file_name=excel_file_name,
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-        st.info("O download do arquivo Excel com todos os dados extraídos está pronto.")
+            st.download_button(
+                label="Clique aqui para baixar o arquivo Excel",
+                data=output,
+                file_name=excel_file_name,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+            st.info("O download do arquivo Excel com todos os dados extraídos está pronto.")
 
 # Executar
 if __name__ == "__main__":
