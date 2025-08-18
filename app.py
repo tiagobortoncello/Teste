@@ -214,4 +214,60 @@ def run_app():
                 text_before_title = text[:title_match.start()]
                 last_project_match = None
                 for match in project_pattern.finditer(text_before_title):
-                    last
+                    last_project_match = match
+                if last_project_match:
+                    sigla_raw = last_project_match.group(2)
+                    sigla_map = {
+                        "requerimento": "RQN",
+                        "projeto de lei": "PL",
+                        "pl": "PL",
+                        "projeto de resolução": "PRE",
+                        "pre": "PRE",
+                        "proposta de emenda à constituição": "PEC",
+                        "pec": "PEC",
+                        "projeto de lei complementar": "PLC",
+                        "plc": "PLC"
+                    }
+                    sigla = sigla_map.get(sigla_raw.lower(), sigla_raw.upper())
+                    numero = last_project_match.group(3).replace(".", "")
+                    ano = last_project_match.group(4)
+                    project_key = (sigla, numero, ano)
+                    item_type = "EMENDA" if "EMENDA" in title_match.group(0).upper() else "SUBSTITUTIVO"
+                    if project_key not in found_projects:
+                        found_projects[project_key] = set()
+                    found_projects[project_key].add(item_type)
+            
+            pareceres = []
+            for (sigla, numero, ano), types in found_projects.items():
+                type_str = "SUB/EMENDA" if len(types) > 1 else list(types)[0]
+                pareceres.append([sigla, numero, ano, type_str])
+            df_pareceres = pd.DataFrame(pareceres)
+        
+        st.success("Dados extraídos com sucesso! ✅")
+        st.divider()
+
+        # ==========================
+        # SALVAR EM EXCEL
+        # ==========================
+        output = io.BytesIO()
+        excel_file_name = "resultado_extraido.xlsx"
+        
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            df_normas.to_excel(writer, sheet_name="Normas", index=False, header=False)
+            df_proposicoes.to_excel(writer, sheet_name="Proposicoes", index=False, header=False)
+            df_requerimentos.to_excel(writer, sheet_name="Requerimentos", index=False, header=False)
+            df_pareceres.to_excel(writer, sheet_name="Pareceres", index=False, header=False)
+        
+        output.seek(0)
+
+        st.download_button(
+            label="Clique aqui para baixar o arquivo Excel",
+            data=output,
+            file_name=excel_file_name,
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        st.info("O download do arquivo Excel com todos os dados extraídos está pronto.")
+
+# Executar
+if __name__ == "__main__":
+    run_app()
